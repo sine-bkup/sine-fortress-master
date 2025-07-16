@@ -1361,6 +1361,8 @@ static const char *g_sDialogVariables[] = {
 	"numMedic",
 	"numSniper",
 	"numSpy",
+	"numScientist",
+	"numRusher",
 	"",
 };
 
