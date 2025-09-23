@@ -361,7 +361,7 @@ void CTFGooGun::FireGoo( int GooType )
 	pProjectile->SetGooType(GooType);
 	pProjectile->SetPropGooLifetime(RemapValClamped(flPercentageCharged, 0.0f, 1.0f, sf_googun_goo_lifetime_min.GetFloat(), sf_googun_goo_lifetime_max.GetFloat()));
 
-	float flChargedDamageValue = flPercentageCharged * GetProjectileDamage();
+	float flChargedDamageValue = RemapValClamped(flPercentageCharged, 0.0f, 1.0f, 1.0f, GetProjectileDamage());
 	pProjectile->SetDamage(flChargedDamageValue);
 
 	//CALL_ATTRIB_HOOK_INT(nMaxGoo, add_max_gooprojectiles);
