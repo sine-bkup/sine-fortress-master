@@ -442,7 +442,7 @@ void CTFProjectile_Goo::Explode(trace_t* pTrace, int bitsDamageType)
 				if (!pAttacker->InSameTeam(pPlayerEntity))
 				{
 					CTakeDamageInfo damageInfo;
-					damageInfo.SetDamage(Max((1.0f - distance / (flRadius * 1.5f)) * m_flDamage, 0.0f));
+					damageInfo.SetDamage(Max((1.0f - distance / (flRadius * 1.5f)) * m_flDamage, 1.0f));
 					damageInfo.SetAttacker(pAttacker);
 					damageInfo.AddDamageType(bitsDamageType);
 					pPlayerEntity->TakeDamage(damageInfo);
