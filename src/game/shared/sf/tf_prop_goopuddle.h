@@ -81,7 +81,11 @@ public:
 	virtual void		Precache();
 
 	void				RecalculateBounds();
-	void				AffectEntitiesInBounds();
+	virtual void		StartTouch(CBaseEntity* pEntity) OVERRIDE;
+	virtual void		EndTouch(CBaseEntity* pEntity) OVERRIDE;
+	virtual void		PerformCustomPhysics(Vector* pNewPosition, Vector* pNewVelocity, QAngle* pNewAngles, QAngle* pNewAngVelocity);
+	virtual void		RemoveGooEffect(CBaseEntity* pEntity);
+	virtual void		RemoveAllEffects();
 
 	void SetRadius(float radius) { m_flRadius.Set(radius); }
 	float GetRadius() { return m_flRadius.Get(); }
@@ -127,10 +131,10 @@ public:
 	virtual void		ClientThink();
 	void				KillPuddle(c_puddleinfo_t* info);
 	//void				UpdatePuddleCount();
-
-	void				RecalculateBounds();
-	virtual void		GetRenderBounds(Vector& mins, Vector& maxs);
+	// 
+	//virtual void		GetRenderBounds(Vector& mins, Vector& maxs);
 	virtual void		GetRenderBoundsWorldspace(Vector& mins, Vector& maxs);
+	virtual bool		ShouldDraw();
 	virtual int			DrawModel(int flags);
 	void				DrawPuddle(c_puddleinfo_t*info, color32 color);
 #endif
@@ -149,9 +153,8 @@ private:
 	PropPuddleState m_PropPuddleState;
 	puddleinfo_t *m_puddles[MAX_PUDDLES];
 
-	bool m_bBoundsNeedRecomputing;
-	Vector m_minBounds;
-	Vector m_maxBounds;
+	//Vector m_minBounds;
+	//Vector m_maxBounds;
 
 	CountdownTimer m_DamageBuildingsTimer;
 
@@ -176,12 +179,11 @@ private:
 	c_puddleinfo_t m_puddleArray[MAX_PUDDLES];
 
 	CMaterialReference m_pMaterial;
-	bool m_bBoundsNeedRecomputed;
 
 	float m_flSpawnTimestamp;
 
-	Vector m_minBounds;
-	Vector m_maxBounds;
+	//Vector m_minBounds;
+	//Vector m_maxBounds;
 
 	//Used for sound events
 	int m_iInitializedPuddles;

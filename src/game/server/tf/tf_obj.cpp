@@ -125,6 +125,8 @@ ConVar  object_deterioration_time( "object_deterioration_time", "30", 0, "Time i
 
 #define PLASMA_DISABLE_TIME					4
 
+extern CTFWeaponInfo* GetTFWeaponInfo(int iWeapon);
+
 IMPLEMENT_AUTO_LIST( IBaseObjectAutoList );
 
 BEGIN_DATADESC( CBaseObject )
@@ -261,6 +263,17 @@ CBaseObject::CBaseObject()
 	m_flBuildDistance = 0.0f;
 
 	m_bForceQuickBuild = false;
+
+	m_hAcidAttacker = NULL;
+	m_flAcidDamage = -1.0f;;
+	m_treeTouchingToxicGooDamage = new CUtlRBTree<ToxicGooDmg_t>;
+	SetDefLessFunc(*m_treeTouchingToxicGooDamage);
+}
+
+CBaseObject::~CBaseObject()
+{
+	delete m_treeTouchingToxicGooDamage;
+	m_treeTouchingToxicGooDamage = NULL;
 }
 
 //-----------------------------------------------------------------------------
@@ -3842,4 +3855,110 @@ int CBaseObject::GetMaxHealthForCurrentLevel( void )
 	}
 
 	return iMaxHealth;
+}
+
+// Sine
+
+#define SF_OBJ_ACID_THINK_CONTEXT "BaseObjectAcidBurnThink"
+void CBaseObject::AcidBurnThink(void)
+{
+	CTakeDamageInfo info(m_hAcidAttacker, m_hAcidAttacker, NULL, m_flAcidDamage, DMG_BURN | DMG_PREVENT_PHYSICS_FORCE, TF_DMG_CUSTOM_ACID_BURN);
+
+	TakeDamage(info);
+
+	SetNextThink(gpGlobals->curtime + TF_ACID_BURN_FREQUENCY, SF_OBJ_ACID_THINK_CONTEXT);
+}
+
+// Copied from tf_player_shared.cpp and modified
+//-----------------------------------------------------------------------------
+// Purpose: Add an instance of acid puddle to our list of touched puddles
+//-----------------------------------------------------------------------------
+void CBaseObject::AcidBurn(CTFPlayer* pAttacker, float damage, bool critical /* = false */)
+{
+	// Don't bother acid burning players who have just been killed by the acid damage.
+	if (!IsAlive())
+		return;
+
+	if (InSameTeam(pAttacker))
+		return;
+
+	bool bFirstAcid = (m_treeTouchingToxicGooDamage->Count() == 0);
+
+	m_treeTouchingToxicGooDamage->Insert(ToxicGooDmg_t(pAttacker, damage, critical));
+
+	// If the damage isn't the highest, just add it to the list
+	if (!bFirstAcid && damage < m_flAcidDamage)
+		return;
+
+	// Damage is higher, use this
+	m_hAcidAttacker = pAttacker;
+	m_flAcidDamage = damage;
+
+	if (bFirstAcid)
+		SetContextThink(&CBaseObject::AcidBurnThink, gpGlobals->curtime, SF_OBJ_ACID_THINK_CONTEXT); //asap
+}
+
+// Copied from tf_player_shared.cpp and modified
+//-----------------------------------------------------------------------------
+// Purpose: Remove an instance of acid puddle from our list of touched puddles
+//-----------------------------------------------------------------------------
+void CBaseObject::RemoveAcidBurn(CTFPlayer* pAttacker, float damage, bool critical)
+{
+	if (!IsAlive())
+		return;
+
+	if (InSameTeam(pAttacker))
+		return;
+
+	// LONG
+	// this just gets the first entry that has the same damage 
+	ToxicGooDmg_t searchKey(pAttacker, damage, critical);
+
+	unsigned short currentIndex = m_treeTouchingToxicGooDamage->FindClosest(searchKey, k_EGreaterThanOrEqualTo);
+	if (currentIndex == m_treeTouchingToxicGooDamage->InvalidIndex()) return;
+	ToxicGooDmg_t currentEntry = m_treeTouchingToxicGooDamage->Element(currentIndex);
+
+	// Find the element that refers to us
+	while (currentEntry.pAttacker != pAttacker)
+	{
+		currentIndex = m_treeTouchingToxicGooDamage->NextInorder(currentIndex);
+
+		if (currentIndex == m_treeTouchingToxicGooDamage->InvalidIndex())
+			break;
+
+		currentEntry = m_treeTouchingToxicGooDamage->Element(currentIndex);
+
+		if (currentEntry.m_bCritical != searchKey.m_bCritical)
+		{
+			currentIndex = m_treeTouchingToxicGooDamage->InvalidIndex();
+			break;
+		}
+	}
+
+	if (currentIndex == m_treeTouchingToxicGooDamage->InvalidIndex())
+		return;
+	if (currentEntry.pAttacker != pAttacker)
+		return;
+
+	// Finally remove our element
+	m_treeTouchingToxicGooDamage->RemoveAt(currentIndex);
+
+	float flMaxGooDamage = (float)GetTFWeaponInfo(TF_WEAPON_GOOGUN)->GetWeaponData(0).m_nDamage;
+
+	// Find the highest damage goo entry the player is standing in
+	// (the struct makes criticals be considered higher than damage of the same amounts without crits)
+	unsigned short nHighestDamageInfo = m_treeTouchingToxicGooDamage->FindClosest(ToxicGooDmg_t(NULL, flMaxGooDamage, true), k_ELessThanOrEqualTo);
+
+	if (nHighestDamageInfo != m_treeTouchingToxicGooDamage->InvalidIndex())
+	{
+		ToxicGooDmg_t highestDamageInfo = m_treeTouchingToxicGooDamage->Element(nHighestDamageInfo);
+
+		m_hAcidAttacker = highestDamageInfo.pAttacker;
+		m_flAcidDamage = highestDamageInfo.m_flDamage;
+		return;
+	}
+
+	m_hAcidAttacker = NULL;
+	m_flAcidDamage = -1.0f;
+	SetNextThink(-1, SF_OBJ_ACID_THINK_CONTEXT);
 }

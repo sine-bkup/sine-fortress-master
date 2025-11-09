@@ -699,12 +699,8 @@ extern const char *g_pszItemClassImagesBlue[];
 #define SHOW_DISGUISE_EFFECT 1
 
 // Acid burning
-#define TF_ACID_BURN_FREQUENCY 0.5f
-#define TF_ACID_BURN_ACID_LIFE 1.0f
-#define TF_ACID_BURN_LVL1_DMG 3
-#define TF_ACID_BURN_LVL2_DMG 6
-#define TF_ACID_BURN_LVL3_DMG 12
-#define TF_ACID_BURN_LVL4_DMG 24
+// maybe make a convar for testing?
+#define TF_ACID_BURN_FREQUENCY 0.1f
 
 //
 // ADD NEW WEAPONS HERE TO AVOID BREAKING DEMOS

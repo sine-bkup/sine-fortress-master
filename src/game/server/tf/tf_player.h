@@ -1117,6 +1117,7 @@ protected:
 	void				TFPlayerThink();
 	void				UpdateTimers( void );
 	void				PostSpawnThink( void );
+	void				AcidBurnThink( void );
 
 	// Regeneration due to being a Medic, or derived from items
 	void				RegenThink();

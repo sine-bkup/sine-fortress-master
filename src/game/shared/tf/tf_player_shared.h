@@ -290,6 +290,7 @@ public:
 
 	// Initialization.
 	CTFPlayerShared();
+	~CTFPlayerShared();
 	void Init( OuterClass *pOuter );
 	void Spawn( void );
 
@@ -446,7 +447,11 @@ public:
 	void	StopBleed( CTFPlayer *pPlayer, CTFWeaponBase *pWeapon );
 #endif // GAME_DLL
 
+	void IncrementJumpGooCounter();
+	void DecrementJumpGooCounter();
+
 	void AcidBurn(CTFPlayer* pAttacker, float damage, bool critical);
+	void RemoveAcidBurn(CTFPlayer* pAttacker, float damage, bool critical);
 
 	// Weapons.
 	CTFWeaponBase *GetActiveTFWeapon() const;
@@ -1047,11 +1052,48 @@ private:
 	CHandle<CTFPlayer>		m_hAcidAttacker;
 	CHandle<CTFWeaponBase>	m_hAcidWeapon;
 	float					m_flAcidDamage;
-	float					m_flAcidBurnTime;
-	float					m_flAcidRemoveTime;
-	int						m_iAcidLevel;
 	bool					m_bAcidCritical;
 
+	struct ToxicGooDmg_t
+	{
+		float m_flDamage;
+		bool m_bCritical;
+		CTFPlayer* pAttacker;
+
+		ToxicGooDmg_t()
+		{
+			this->pAttacker = nullptr;
+			this->m_flDamage = 0;
+			this->m_bCritical = false;
+		}
+
+		ToxicGooDmg_t(CTFPlayer* pAttacker, float damage, bool critical)
+		{
+			this->pAttacker = pAttacker;
+			this->m_flDamage = damage;
+			this->m_bCritical = critical;
+		}
+
+		inline bool operator<(const ToxicGooDmg_t& other) const
+		{
+			if (m_flDamage == other.m_flDamage)
+				if (m_bCritical) return false;
+				else return other.m_bCritical;
+
+			return m_flDamage < other.m_flDamage;
+		}
+
+		inline bool operator==(const ToxicGooDmg_t& other) const
+		{
+			return (m_flDamage == other.m_flDamage) && (m_bCritical != other.m_bCritical);
+		}
+
+	};
+
+	unsigned int m_nTouchingJumpGooCount;
+	CUtlRBTree<ToxicGooDmg_t>* m_treeTouchingToxicGooDamage;
+
+private:
 	// Bleeding
 	struct bleed_struct_t
 	{

@@ -11,7 +11,6 @@
 #endif
 
 ConVar sf_goopuddle_think_tick_time("sf_goopuddle_think_tick_time", "0.1", FCVAR_CHEAT | FCVAR_REPLICATED);
-ConVar sf_goopuddle_damage_tick_time("sf_goopuddle_damage_tick_time", "0.5", FCVAR_CHEAT | FCVAR_REPLICATED);
 
 ConVar sf_goo_team_requirements("sf_goo_team_requirements", "1", FCVAR_REPLICATED | FCVAR_ARCHIVE /*| FCVAR_DEVELOPMENTONLY*/, "Sets jump goo team requirements. 0 is any team, 1 is your own team, 2 is only enemy team");
 
@@ -51,7 +50,6 @@ CTFPropGooPuddle::CTFPropGooPuddle()
 	m_FinishedSpreading = false;
 	m_PuddleCount = 0;
 	m_CurPuddleOffset = 0;
-	m_bBoundsNeedRecomputing = true;
 }
 
 CTFPropGooPuddle::~CTFPropGooPuddle()
@@ -67,11 +65,15 @@ void CTFPropGooPuddle::Spawn()
 {
 	SetState(PROPPUDDLESTATE_STARTING);
 
-	SetModel(SF_GOOPUDDLE_TESTMODEL);
-	SetModelScale(0);
-
 	SetThink(&CTFPropGooPuddle::PuddleThink);
 	SetNextThink(gpGlobals->curtime);
+
+	SetSolid(SOLID_BBOX);
+	AddSolidFlags(FSOLID_NOT_SOLID | FSOLID_TRIGGER);
+	// Since goo puddles don't use a model, we need to force it to transmit the entity
+	AddEFlags(EFL_FORCE_CHECK_TRANSMIT);
+
+	SetMoveType(MOVETYPE_CUSTOM);
 }
 
 void CTFPropGooPuddle::Precache()
@@ -83,8 +85,8 @@ void CTFPropGooPuddle::Precache()
 
 void CTFPropGooPuddle::RecalculateBounds()
 {
-	m_minBounds = GetAbsOrigin() + Vector(64.9f, 64.9f, 64.9f);
-	m_maxBounds = GetAbsOrigin() + Vector(-64.9f, -64.9f, -64.9f);
+	Vector m_minBounds = Vector(64.9f, 64.9f, 64.9f);
+	Vector m_maxBounds = Vector(-64.9f, -64.9f, -64.9f);
 
 	for (int i = 0; i < m_PuddleCount; ++i)
 	{
@@ -93,126 +95,201 @@ void CTFPropGooPuddle::RecalculateBounds()
 		if (!info || info->finishedSpreading)
 			continue;
 
-		if (info->pos.x - PUDDLE_MAX_HALF_WIDTH < m_minBounds.x)
-			m_minBounds.x = info->pos.x - PUDDLE_MAX_HALF_WIDTH;
+		Vector puddlePos = info->pos - GetAbsOrigin();
 
-		if (info->pos.x + PUDDLE_MAX_HALF_WIDTH > m_maxBounds.x)
-			m_maxBounds.x = info->pos.x + PUDDLE_MAX_HALF_WIDTH;
+		if (puddlePos.x - PUDDLE_MAX_HALF_WIDTH < m_minBounds.x)
+			m_minBounds.x = puddlePos.x - PUDDLE_MAX_HALF_WIDTH;
 
-		if (info->pos.y - PUDDLE_MAX_HALF_WIDTH < m_minBounds.y)
-			m_minBounds.y = info->pos.y - PUDDLE_MAX_HALF_WIDTH;
+		if (puddlePos.x + PUDDLE_MAX_HALF_WIDTH > m_maxBounds.x)
+			m_maxBounds.x = puddlePos.x + PUDDLE_MAX_HALF_WIDTH;
 
-		if (info->pos.y + PUDDLE_MAX_HALF_WIDTH > m_maxBounds.y)
-			m_maxBounds.y = info->pos.y + PUDDLE_MAX_HALF_WIDTH;
+		if (puddlePos.y - PUDDLE_MAX_HALF_WIDTH < m_minBounds.y)
+			m_minBounds.y = puddlePos.y - PUDDLE_MAX_HALF_WIDTH;
 
-		if (info->pos.z < m_minBounds.z)
-			m_minBounds.z = info->pos.z;
+		if (puddlePos.y + PUDDLE_MAX_HALF_WIDTH > m_maxBounds.y)
+			m_maxBounds.y = puddlePos.y + PUDDLE_MAX_HALF_WIDTH;
 
-		if (info->pos.z + PUDDLE_MAX_HEIGHT > m_maxBounds.z)
-			m_maxBounds.z = info->pos.z + PUDDLE_MAX_HEIGHT;
+		if (puddlePos.z < m_minBounds.z)
+			m_minBounds.z = puddlePos.z;
+
+		if (puddlePos.z + PUDDLE_MAX_HEIGHT > m_maxBounds.z)
+			m_maxBounds.z = puddlePos.z + PUDDLE_MAX_HEIGHT;
+	}
+
+	UTIL_SetSize(this, m_minBounds, m_maxBounds);
+}
+
+void CTFPropGooPuddle::StartTouch(CBaseEntity* pEntity)
+{
+	// Sometimes entities will notify entities they have stopped/started touching after RemoveThis(),
+	// other times it won't.. so we are just gonna ignore it
+	if (m_PropPuddleState == PROPPUDDLESTATE_DYING)
+		return;
+	
+	// There is probably a better way to organize this code, but it's readable so -Vruk
+	CTFPlayer* pPlayer;
+	bool bIsPlayer;
+	CBaseObject* pObject;
+	bool bIsObject;
+
+	if (pEntity->IsPlayer())
+	{
+		pPlayer = ToTFPlayer(pEntity);
+		if (!pPlayer)
+			return;
+		bIsPlayer = true;
+		bIsObject = false;
+	}
+	else if (pEntity->IsBaseObject())
+	{
+		// Assert( dynamic_cast<CTFPlayer*>( pEntity ) != 0 );
+		// as if that assert would really help us anyways considering
+		// how useless asserts are in the sdk for debugging
+		pObject = static_cast<CBaseObject*>(pEntity);
+		if (!pObject)
+			return;
+		bIsPlayer = false;
+		bIsObject = true;
+	}
+	else
+		return;
+	
+	switch (GetGooType())
+	{
+		case TF_GOO_JUMP:
+		{
+			//unsigned int m_nTouchingJumpGooCount;
+			if (bIsPlayer)
+			{
+				if (pPlayer->InSameTeam(GetOwnerEntity()) && sf_goo_team_requirements.GetInt() != 2 || (!pPlayer->InSameTeam(GetOwnerEntity()) && sf_goo_team_requirements.GetInt() != 1))
+				{
+					pPlayer->m_Shared.IncrementJumpGooCounter();
+				}
+			}
+			break;
+		}
+
+		case TF_GOO_TOXIC:
+		{
+			if (bIsPlayer)
+			{
+				//CUtlRBTree<float> m_treeTouchingToxicGooDamage;
+				pPlayer->m_Shared.AcidBurn(ToTFPlayer(GetOwnerEntity()), m_flDamage, m_bCritical);
+			}
+			else if (bIsObject)
+			{
+				pObject->AcidBurn(ToTFPlayer(GetOwnerEntity()), m_flDamage, m_bCritical);
+			}
+			break;
+		}
+
+	default:
+		break;
 	}
 }
 
-void CTFPropGooPuddle::AffectEntitiesInBounds()
+void CTFPropGooPuddle::EndTouch(CBaseEntity* pEntity)
 {
-	CBaseEntity* pEnt[1024];
-	int iNumberOfNearbyEntities = UTIL_EntitiesInBox(pEnt, ARRAYSIZE(pEnt), m_minBounds, m_maxBounds, 0);
-
-	/*for (int i = 0; i < 256; i++)
-	{
-		CBaseEntity *entity = pEnt[i];
-
-		if (!entity)
-			break;
-
-
-		CTakeDamageInfo info(this, GetOwnerEntity(), m_flDamage, DMG_ACID);
-		TakeDamage(info);
-	}*/
-
-	Vector vecOrigin = GetAbsOrigin();
-
-	//Get the goo's owner for damage info
-	//Grenades use thrower rather than GetOwnerEntity()
-	CBaseEntity* pOwner = GetOwnerEntity();
-	CTFPlayer* pTFProjOwner = ToTFPlayer(pOwner);
-	if (!pTFProjOwner)
+	// Sometimes entities will notify entities they have stopped/started touching after RemoveThis(),
+	// other times it won't.. so we are just gonna ignore it
+	if (m_PropPuddleState == PROPPUDDLESTATE_DYING)
 		return;
-	CBaseEntity* pAttacker = NULL;
-	IScorer* pScorerInterface = dynamic_cast<IScorer*>(pOwner);
-	if (pScorerInterface)
+
+	if (!pEntity->IsPlayer() && !pEntity->IsBaseObject())
+		return;
+	
+	RemoveGooEffect(pEntity);
+}
+
+void CTFPropGooPuddle::PerformCustomPhysics(Vector* pNewPosition, Vector* pNewVelocity, QAngle* pNewAngles, QAngle* pNewAngVelocity)
+{
+	Vector prevOrigin;
+	VectorCopy(GetAbsOrigin(), prevOrigin);
+
+	PhysicsTouchTriggers(&prevOrigin);
+}
+
+void CTFPropGooPuddle::RemoveGooEffect(CBaseEntity* pEntity)
+{
+	if (!pEntity) return;
+
+	// There is probably a better way to organize this code, but it's readable so -Vruk
+	CTFPlayer* pPlayer;
+	bool bIsPlayer;
+	CBaseObject* pObject;
+	bool bIsObject;
+
+	if (pEntity->IsPlayer())
 	{
-		pAttacker = pScorerInterface->GetScorer();
+		pPlayer = ToTFPlayer(pEntity);
+		if (!pPlayer)
+			return;
+		bIsPlayer = true;
+		bIsObject = false;
+	}
+	else if (pEntity->IsBaseObject())
+	{
+		// Assert( dynamic_cast<CTFPlayer*>( pEntity ) != 0 );
+		// as if that assert would really help us anyways considering
+		// how useless asserts are in the sdk for debugging
+		pObject = static_cast<CBaseObject*>(pEntity);
+		if (!pObject)
+			return;
+		bIsPlayer = false;
+		bIsObject = true;
+	}
+	else
+		return;
+
+	switch (GetGooType())
+	{
+		case TF_GOO_JUMP:
+		{
+			if (bIsPlayer)
+			{
+				if (pPlayer->InSameTeam(GetOwnerEntity()) && sf_goo_team_requirements.GetInt() != 2 || (!pPlayer->InSameTeam(GetOwnerEntity()) && sf_goo_team_requirements.GetInt() != 1))
+				{
+					pPlayer->m_Shared.DecrementJumpGooCounter();
+				}
+			}
+			break;
+		}
+
+		case TF_GOO_TOXIC:
+		{
+			if (bIsPlayer)
+			{
+				pPlayer->m_Shared.RemoveAcidBurn(ToTFPlayer(GetOwnerEntity()), m_flDamage, m_bCritical);
+			}
+			else if (bIsObject)
+			{
+				pObject->RemoveAcidBurn(ToTFPlayer(GetOwnerEntity()), m_flDamage, m_bCritical);
+			}
+			break;
+		}
+		default:
+			break;
 	}
 
+}
 
-	trace_t	trace;
+void CTFPropGooPuddle::RemoveAllEffects()
+{
+	touchlink_t* root = (touchlink_t*)GetDataObject(TOUCHLINK);
+	if (!root) return;
 
-	for (int i = 0; i < iNumberOfNearbyEntities; i++)
+	for (touchlink_t* link = root->nextLink; link != root; link = link->nextLink)
 	{
-		CBaseEntity* pEntity = pEnt[i];
-		if (!pEntity)
-			break;
+		CBaseEntity* pTouch = link->entityTouched;
+		if (!pTouch) continue;
+		if (!pTouch->IsPlayer() && !pTouch->IsBaseObject()) continue;
 
-		if (pEntity == this || !pEntity->IsAlive() || GetAbsOrigin().DistTo(pEntity->GetAbsOrigin()) > m_flRadius)
-			continue;
-
-		//Detect if wall is between player and goo
-		Ray_t ray;
-		Vector EntityVecOrigin = pEntity->GetAbsOrigin();
-		ray.Init(vecOrigin + Vector(0.0f,0.0f, 50.0f), EntityVecOrigin);
-		UTIL_TraceRay(ray, MASK_PLAYERSOLID_BRUSHONLY, this, COLLISION_GROUP_PLAYER_MOVEMENT, &trace);
-		if (trace.DidHitWorld())
-			continue;
-
-		//if (trace.DidHitWorld() || EntityVecOrigin.z >= (vecOrigin.z + 20) || EntityVecOrigin.z <= (vecOrigin.z - 20))
-			//continue;
-
-		if (pEntity->IsPlayer())
-		{
-			CTFPlayer* pPlayerEntity = ToTFPlayer(pEntity);
-
-			bool allowBuffGoo = (pPlayerEntity->InSameTeam(pTFProjOwner) && sf_goo_team_requirements.GetInt() != 2) || (!pPlayerEntity->InSameTeam(pTFProjOwner) && sf_goo_team_requirements.GetInt() != 1);
-			switch (GetGooType())
-			{
-			case TF_GOO_TOXIC:
-				if (!pPlayerEntity->InSameTeam(pTFProjOwner))
-				{
-					pPlayerEntity->m_Shared.AcidBurn(pTFProjOwner, m_flDamage, m_bCritical);
-
-					//pEntity->TakeDamage( info );
-				}
-				break;
-			case TF_GOO_JUMP:
-				if (allowBuffGoo)
-				{
-					pPlayerEntity->m_Shared.AddCond(TF_COND_JUMP_GOO, 0.8f);
-				}
-				break;
-			default:
-				Warning("Goo type %d not implemented", GetGooType());
-			}
-		}
-		// Only toxic goo needs to affect buildings currently
-		else if (pEntity->IsBaseObject() && GetGooType() == TF_GOO_TOXIC && m_DamageBuildingsTimer.IsElapsed())
-		{
-			CBaseObject* pObject = static_cast<CBaseObject*>(pEntity);
-			//Damage buildings inside of the radius 
-			CTakeDamageInfo info(this, pAttacker, GetDamage(), DMG_ACID);
-
-			if (pObject->IsAlive() && !pObject->InSameTeam(pOwner))
-				pEntity->TakeDamage(info);
-			else
-				continue;
-
-			m_DamageBuildingsTimer.Start(PUDDLE_DAMAGE_BUILDINGS_INTERVAL);
-		}
+		RemoveGooEffect(pTouch);
 	}
 }
 
 void CTFPropGooPuddle::PuddleThink()
 {
-	//TODO: Change all this to a state machine
 	switch (m_PropPuddleState)
 	{
 		case PROPPUDDLESTATE_STARTING:
@@ -233,9 +310,8 @@ void CTFPropGooPuddle::PuddleThink()
 
 				m_vecPuddlePos.Set(i, nextPos);
 				m_PuddleCount++;
-
-				RecalculateBounds();
 			}
+			RecalculateBounds();
 			SetState(PROPPUDDLESTATE_SPREADING);
 			break;
 		}
@@ -245,30 +321,28 @@ void CTFPropGooPuddle::PuddleThink()
 			if (PuddlesMade == 0)
 			{
 				SetState(PROPPUDDLESTATE_ACTIVE);
+				RecalculateBounds();
 			}
 			break;
 		}
 		case PROPPUDDLESTATE_ACTIVE:
 		{
-			if(m_bBoundsNeedRecomputing)
-				RecalculateBounds();
-
+			// Let this flow into the PROPPUDDLESTATE_DYING by not putting a break
 			if (gpGlobals->curtime - m_flStateTimestamp > m_flLifetime)
 			{
 				SetState(PROPPUDDLESTATE_DYING);
 			}
-			break;
+			else
+			{
+				break;
+			}
 		}
 		case PROPPUDDLESTATE_DYING:
 		{
+			RemoveAllEffects();
 			RemoveThis();
 			break;
 		}
-	}
-
-	if (m_PropPuddleState != PROPPUDDLESTATE_DYING)
-	{
-		AffectEntitiesInBounds();
 	}
 
 	SetNextThink(gpGlobals->curtime + sf_goopuddle_think_tick_time.GetFloat());
@@ -486,8 +560,6 @@ void CTFPropGooPuddle::InitializePuddleInfo(c_puddleinfo_t* info, Vector pos)
 	info->lifetime.Start(m_flLifetime - GetTimeSinceSpawned());
 
 	m_iInitializedPuddles += 1;
-
-	m_bBoundsNeedRecomputed = true;
 }
 
 void CTFPropGooPuddle::ClientThink()
@@ -543,14 +615,6 @@ void CTFPropGooPuddle::ClientThink()
 			case PUDDLESTATE_UNINITIALIZED:
 			default:
 				continue;
-		}
-	}
-	if (m_bBoundsNeedRecomputed)
-	{
-		RecalculateBounds();
-		if (GetRenderHandle() != INVALID_CLIENT_RENDER_HANDLE)
-		{
-			ClientLeafSystem()->RenderableChanged(GetRenderHandle());
 		}
 	}
 	if (m_nGooType == TF_GOO_TOXIC)
@@ -614,39 +678,7 @@ void CTFPropGooPuddle::UpdatePuddleCount()
 	m_PuddleCount = i;
 }*/
 
-void CTFPropGooPuddle::RecalculateBounds()
-{
-	m_minBounds = GetAbsOrigin() + Vector(64.9f, 64.9f, 64.9f);
-	m_maxBounds = GetAbsOrigin() + Vector(-64.9f, -64.9f, -64.9f);
-
-	for (int i = 0; i < m_PuddleCount; ++i)
-	{
-		c_puddleinfo_t* info = &m_puddleArray[i];
-
-		if (info->state == PUDDLESTATE_DEAD || info->state == PUDDLESTATE_UNINITIALIZED)
-			continue;
-
-		if (info->pos.x - PUDDLE_MAX_HALF_WIDTH < m_minBounds.x)
-			m_minBounds.x = info->pos.x - PUDDLE_MAX_HALF_WIDTH;
-
-		if (info->pos.x + PUDDLE_MAX_HALF_WIDTH > m_maxBounds.x)
-			m_maxBounds.x = info->pos.x + PUDDLE_MAX_HALF_WIDTH;
-
-		if (info->pos.y - PUDDLE_MAX_HALF_WIDTH < m_minBounds.y)
-			m_minBounds.y = info->pos.y - PUDDLE_MAX_HALF_WIDTH;
-
-		if (info->pos.y + PUDDLE_MAX_HALF_WIDTH > m_maxBounds.y)
-			m_maxBounds.y = info->pos.y + PUDDLE_MAX_HALF_WIDTH;
-
-		if (info->pos.z < m_minBounds.z)
-			m_minBounds.z = info->pos.z;
-
-		if (info->pos.z + PUDDLE_MAX_HEIGHT > m_maxBounds.z)
-			m_maxBounds.z = info->pos.z + PUDDLE_MAX_HEIGHT;
-	}
-
-}
-
+/*
 void CTFPropGooPuddle::GetRenderBounds(Vector& mins, Vector& maxs)
 {
 	if (!m_PuddleCount)
@@ -655,10 +687,11 @@ void CTFPropGooPuddle::GetRenderBounds(Vector& mins, Vector& maxs)
 		maxs = Vector(0, 0, 0);
 		return;
 	}
-	mins = m_minBounds;
-	maxs = m_maxBounds;
-		
-}
+	mins = CollisionProp()->OBBMins();
+	maxs = CollisionProp()->OBBMaxs();
+
+}*/
+
 void CTFPropGooPuddle::GetRenderBoundsWorldspace(Vector& mins, Vector& maxs)
 {
 	if (!m_PuddleCount)
@@ -667,8 +700,13 @@ void CTFPropGooPuddle::GetRenderBoundsWorldspace(Vector& mins, Vector& maxs)
 		maxs = Vector(0, 0, 0);
 		return;
 	}
-	mins = m_minBounds;
-	maxs = m_maxBounds;
+	mins = GetAbsOrigin() + CollisionProp()->OBBMins();
+	maxs = GetAbsOrigin() + CollisionProp()->OBBMaxs();
+}
+
+bool CTFPropGooPuddle::ShouldDraw()
+{
+	return true;
 }
 
 int CTFPropGooPuddle::DrawModel(int flags)

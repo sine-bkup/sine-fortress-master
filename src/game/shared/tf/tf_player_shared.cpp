@@ -859,6 +859,9 @@ CTFPlayerShared::CTFPlayerShared()
 	m_flCloakStartTime = -1.0f;
 
 	ListenForGameEvent( "player_disconnect" );
+
+	m_treeTouchingToxicGooDamage = new CUtlRBTree<ToxicGooDmg_t>;
+	SetDefLessFunc(*m_treeTouchingToxicGooDamage);
 #else
 	m_pWheelEffect = NULL;
 	m_angVehicleMoveAngles = QAngle( 0.f, 0.f, 0.f );
@@ -913,6 +916,14 @@ CTFPlayerShared::CTFPlayerShared()
 
 	// make sure we have all conditions in the list
 	m_ConditionData.EnsureCount( TF_COND_LAST );
+}
+
+CTFPlayerShared::~CTFPlayerShared()
+{
+#ifdef GAME_DLL
+	delete m_treeTouchingToxicGooDamage;
+	m_treeTouchingToxicGooDamage = NULL;
+#endif
 }
 
 //-----------------------------------------------------------------------------
@@ -3080,16 +3091,10 @@ void CTFPlayerShared::ConditionGameRulesThink( void )
 	}
 
 	//SF conds defined here:
-
-	if (InCond(TF_COND_ACID_BURN))
+	/*
+	if (InCond(TF_COND_ACID_BURN) && m_pOuter->GetWaterLevel() < WL_Waist)
 	{
-		// If we're underwater, put the fire out
-		if (gpGlobals->curtime > m_flAcidRemoveTime || m_pOuter->GetWaterLevel() >= WL_Waist)
-		{
-			RemoveCond(TF_COND_ACID_BURN);
-			//m_iAcidLevel = 0;
-		}
-		else if (gpGlobals->curtime >= m_flAcidBurnTime)
+		if (gpGlobals->curtime >= m_flAcidBurnTime)
 		{
 			//Coder: Might need to remake this later
 			//CALL_ATTRIB_HOOK_FLOAT_ON_OTHER(m_hBurnWeapon, flBurnDamage, mult_wpn_burndmg);
@@ -3120,6 +3125,7 @@ void CTFPlayerShared::ConditionGameRulesThink( void )
 			m_flNextAcidBurnSound = gpGlobals->curtime + 2.5;
 		}
 	}
+	*/
 
 #endif // GAME_DLL
 }
@@ -6898,8 +6904,29 @@ void CTFPlayerShared::StopBleed( CTFPlayer *pPlayer, CTFWeaponBase *pWeapon )
 }
 #endif // GAME_DLL
 
+void CTFPlayerShared::IncrementJumpGooCounter()
+{
+#ifdef GAME_DLL
+	if(m_nTouchingJumpGooCount == 0)
+		AddCond(TF_COND_JUMP_GOO);
+
+	m_nTouchingJumpGooCount++;
+#endif
+}
+void CTFPlayerShared::DecrementJumpGooCounter()
+{
+#ifdef GAME_DLL
+	if(m_nTouchingJumpGooCount > 0)
+		m_nTouchingJumpGooCount--;
+
+	if(m_nTouchingJumpGooCount == 0)
+		RemoveCond(TF_COND_JUMP_GOO);
+#endif
+}
+
 //-----------------------------------------------------------------------------
-// Purpose: 
+// Purpose: Set AcidBurn info and AddCond
+// WILL replace current damage, critical state, and attacker values
 //-----------------------------------------------------------------------------
 void CTFPlayerShared::AcidBurn(CTFPlayer* pAttacker, float damage, bool critical /* = false */)
 {
@@ -6908,31 +6935,120 @@ void CTFPlayerShared::AcidBurn(CTFPlayer* pAttacker, float damage, bool critical
 	if (!m_pOuter->IsAlive())
 		return;
 
-	// scientists don't take acid damage and don't add inferior acid damage
-	//if (TF_CLASS_SCIENTIST == m_pOuter->GetPlayerClass()->GetClassIndex() || nAcidLevel < m_iAcidLevel)
-		//return;
+	if (m_pOuter->InSameTeam(pAttacker))
+		return;
+
+	m_treeTouchingToxicGooDamage->Insert(ToxicGooDmg_t(pAttacker, damage, critical));
+
+	// If the damage isn't the highest, just add it to the list
+	if ((damage * (critical ? 2 : 1)) < m_flAcidDamage * (m_bAcidCritical ? 2 : 1))
+		return;
+	
+	// Damage is higher, use this
+	m_hAcidAttacker = pAttacker;
+	m_flAcidDamage = damage;
+	m_bAcidCritical = critical;
 
 	bool bNewAcid = false;
-
-	// Don't set next acid damage to be asap if player already had acid damage 
-	if (!InCond(TF_COND_ACID_BURN))
+	if (!InCond(TF_COND_ACID_BURN));
+	{
+		AddCond(TF_COND_ACID_BURN);
 		bNewAcid = true;
-
-	if (damage > m_flAcidDamage) m_flAcidDamage = damage; //prevent goo overlap damage
-
-
-	AddCond(TF_COND_ACID_BURN);
+	}
 
 	if (bNewAcid)
-		m_flAcidBurnTime = gpGlobals->curtime;	//asap
+		m_pOuter->SetNextThink(gpGlobals->curtime, "AcidBurnThink"); //asap
 
-	if (critical)
-		m_bAcidCritical = true;
-
-	m_flAcidRemoveTime = gpGlobals->curtime + TF_ACID_BURN_ACID_LIFE;
-	m_hAcidAttacker = pAttacker;
 	//m_hAcidWeapon = pWeapon;
 
+#endif
+}
+
+#ifdef GAME_DLL
+// Copied from tf_fx_explosions.cpp client side code
+//--------------------------------------------------------------------------------------------------------------
+CTFWeaponInfo* GetTFWeaponInfo(int iWeapon)
+{
+	// Get the weapon information.
+	const char* pszWeaponAlias = WeaponIdToAlias(iWeapon);
+	if (!pszWeaponAlias)
+	{
+		return NULL;
+	}
+
+	WEAPON_FILE_INFO_HANDLE	hWpnInfo = LookupWeaponInfoSlot(pszWeaponAlias);
+	if (hWpnInfo == GetInvalidWeaponInfoHandle())
+	{
+		return NULL;
+	}
+
+	CTFWeaponInfo* pWeaponInfo = static_cast<CTFWeaponInfo*>(GetFileWeaponInfoFromHandle(hWpnInfo));
+	return pWeaponInfo;
+}
+#endif
+
+//-----------------------------------------------------------------------------
+// Purpose: 
+//-----------------------------------------------------------------------------
+void CTFPlayerShared::RemoveAcidBurn(CTFPlayer* pAttacker, float damage, bool critical)
+{
+	if (!m_pOuter->IsAlive())
+		return;
+
+	if (m_pOuter->InSameTeam(pAttacker))
+		return;
+
+#ifdef GAME_DLL
+	// LONG
+	// this just gets the first entry that has the same damage 
+	ToxicGooDmg_t searchKey(pAttacker, damage, critical);
+
+	unsigned short currentIndex = m_treeTouchingToxicGooDamage->FindClosest(searchKey, k_EGreaterThanOrEqualTo);
+	if (currentIndex == m_treeTouchingToxicGooDamage->InvalidIndex()) return;
+	ToxicGooDmg_t currentEntry = m_treeTouchingToxicGooDamage->Element(currentIndex);
+
+	// Find the element that refers to us
+	while (currentEntry.pAttacker != pAttacker)
+	{
+		currentIndex = m_treeTouchingToxicGooDamage->NextInorder(currentIndex);
+
+		if (currentIndex == m_treeTouchingToxicGooDamage->InvalidIndex())
+			break;
+
+		currentEntry = m_treeTouchingToxicGooDamage->Element(currentIndex);
+
+		if (currentEntry.m_bCritical != searchKey.m_bCritical)
+		{
+			currentIndex = m_treeTouchingToxicGooDamage->InvalidIndex();
+			break;
+		}
+	}
+
+	if (currentIndex == m_treeTouchingToxicGooDamage->InvalidIndex())
+		return;
+	if (currentEntry.pAttacker != pAttacker)
+		return;
+
+	// Finally remove our element
+	m_treeTouchingToxicGooDamage->RemoveAt(currentIndex);
+	if (m_treeTouchingToxicGooDamage->Count() == 0)
+	{
+		RemoveCond(TF_COND_ACID_BURN);
+		return;
+	}
+
+	float flMaxGooDamage = (float)GetTFWeaponInfo(TF_WEAPON_GOOGUN)->GetWeaponData(0).m_nDamage;
+
+	// Find the highest damage goo entry the player is standing in
+	// (the struct makes criticals be considered higher than damage of the same amounts without crits)
+	unsigned short nHighestDamageInfo = m_treeTouchingToxicGooDamage->FindClosest(ToxicGooDmg_t(NULL, flMaxGooDamage, true), k_ELessThanOrEqualTo);
+
+	ToxicGooDmg_t highestDamageInfo = m_treeTouchingToxicGooDamage->Element(nHighestDamageInfo);
+	
+	m_hAcidAttacker = highestDamageInfo.pAttacker;
+	//m_hAcidWeapon = nullptr; // ????
+	m_flAcidDamage = highestDamageInfo.m_flDamage;
+	m_bAcidCritical = highestDamageInfo.m_bCritical;
 #endif
 }
 
@@ -7010,16 +7126,22 @@ void CTFPlayerShared::OnRemoveAcidBurn(void)
 	m_pOuter->m_flAcidBurnEffectStartTime = 0;
 	m_pOuter->m_flAcidBurnEffectEndTime = 0;
 #else
-	m_hAcidAttacker = NULL;
-	m_hAcidWeapon = NULL;
-	m_iAcidLevel = 0;
-	m_flAcidDamage = 0;
+	m_hAcidAttacker = nullptr;
+	m_hAcidWeapon = nullptr;
+	m_flAcidDamage = -1.0f;
+	m_bAcidCritical = false;
+
+	m_treeTouchingToxicGooDamage->Purge();
+
+	m_pOuter->SetNextThink(TICK_NEVER_THINK, "AcidBurnThink");
 #endif
 }
 
 void CTFPlayerShared::OnRemoveJumpGoo(void)
 {
-	//There is nothing here yet, too bad
+#ifdef GAME_DLL
+	m_nTouchingJumpGooCount = 0;
+#endif
 }
 
 //-----------------------------------------------------------------------------
@@ -7456,6 +7578,10 @@ void CTFPlayerShared::OnAddAcidBurn(void)
 	// play a fire-starting sound
 	if (m_pOuter->m_flAcidBurnEffectEndTime < gpGlobals->curtime)
 		m_pOuter->EmitSound("Fire.Engulf");
+#endif
+
+#ifdef GAME_DLL
+	m_pOuter->SetContextThink(&CTFPlayer::AcidBurnThink, gpGlobals->curtime, "AcidBurnThink");
 #endif
 }
 

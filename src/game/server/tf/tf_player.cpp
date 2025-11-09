@@ -2123,6 +2123,43 @@ void CTFPlayer::PostSpawnThink( void )
 	}
 }
 
+void CTFPlayer::AcidBurnThink()
+{
+	if (IsAlive() && GetWaterLevel() < WL_Waist)
+	{
+		//Vruk: Might need to use this attribute later:
+		//CALL_ATTRIB_HOOK_FLOAT_ON_OTHER(m_hBurnWeapon, flBurnDamage, mult_wpn_burndmg);
+
+		CTakeDamageInfo info(m_Shared.m_hAcidAttacker, m_Shared.m_hAcidAttacker, m_Shared.m_hAcidWeapon, m_Shared.m_flAcidDamage, DMG_BURN | DMG_PREVENT_PHYSICS_FORCE, TF_DMG_CUSTOM_ACID_BURN);
+
+		ConVarRef sf_goo_scientist_resistance("sf_goo_scientist_resistance");
+		ConVarRef sf_goo_scientist_resistance_percentage("sf_goo_scientist_resistance_percentage");
+
+		if (IsPlayerClass(TF_CLASS_SCIENTIST) && sf_goo_scientist_resistance.GetBool()) //if Sci has damage resistance on AND goo from other team
+		{
+			float flDamage = m_Shared.m_flAcidDamage;
+			flDamage *= ((100.0f - sf_goo_scientist_resistance_percentage.GetFloat()) / 100.0f);
+			info.SetDamage(flDamage);
+		}
+
+		if (m_Shared.m_bAcidCritical)
+		{
+			info.SetCritType(CTakeDamageInfo::CRIT_MINI);
+			m_Shared.m_bAcidCritical = false;
+		}
+
+		TakeDamage(info);
+
+		if (IsAlive() && m_Shared.m_flNextAcidBurnSound < gpGlobals->curtime)
+		{
+			SpeakConceptIfAllowed(MP_CONCEPT_ONFIRE);
+			m_Shared.m_flNextAcidBurnSound = gpGlobals->curtime + 2.5;
+		}
+	}
+
+	SetNextThink(gpGlobals->curtime + TF_ACID_BURN_FREQUENCY, "AcidBurnThink");
+}
+
 //-----------------------------------------------------------------------------
 // Estimate where a projectile fired from the given weapon will initially hit (it may bounce on from there).
 // NOTE: We should be able to directly compute this knowing initial velocity, angle, gravity, etc, 
@@ -3942,6 +3979,7 @@ void CTFPlayer::Spawn()
 	}
 
 	SetContextThink( &CTFPlayer::PostSpawnThink, gpGlobals->curtime + 0.1f, "PostSpawnThink" );
+	SetContextThink( &CTFPlayer::AcidBurnThink, TICK_NEVER_THINK, "AcidBurnThink");
 }
 
 //-----------------------------------------------------------------------------
@@ -4096,6 +4134,8 @@ void CTFPlayer::Regenerate( bool bRefillHealthAndAmmo /*= true*/ )
 		{
 			m_Shared.RemoveCond(TF_COND_ACID_BURN);
 		}
+		if (m_Shared.InCond(TF_COND_JUMP_GOO))
+			m_Shared.RemoveCond(TF_COND_JUMP_GOO);
 
 
 		m_Shared.SetSpyCloakMeter( 100.0f );

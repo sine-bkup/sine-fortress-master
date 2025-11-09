@@ -247,6 +247,7 @@ bool CTFGooGun::AddGoo(CTFPropGooPuddle *pGoo)
 			// this is a while loop because the convar value might change
 			while (pTemp && m_MovementGooPuddles.Count() > sf_googun_goo_max_movement.GetInt())
 			{
+				pTemp->RemoveAllEffects();
 				pTemp->RemoveThis();
 				m_MovementGooPuddles.Remove(0);
 				pTemp = m_MovementGooPuddles[0];

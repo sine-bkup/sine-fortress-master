@@ -74,6 +74,7 @@ class CBaseObject : public CBaseCombatCharacter, public IHasBuildPoints, public 
 	DECLARE_CLASS( CBaseObject, CBaseCombatCharacter );
 public:
 	CBaseObject();
+	~CBaseObject();
 
 	virtual void	UpdateOnRemove( void );
 
@@ -347,6 +348,12 @@ public:
 
 	Vector GetBuildOrigin() { return m_vecBuildOrigin; }
 	Vector GetBuildCenterOfMass() { return m_vecBuildCenterOfMass; }
+
+	// Sine
+	void AcidBurnThink(void);
+	void AcidBurn(CTFPlayer* pAttacker, float damage, bool critical /* = false */);
+	void RemoveAcidBurn(CTFPlayer* pAttacker, float damage, bool critical);
+
 protected:
 
 	virtual bool CanBeUpgraded() const { return !( IsDisposableBuilding() || IsMiniBuilding() ); }
@@ -512,6 +519,51 @@ private:
 	float	m_flBuildDistance;
 
 	bool	m_bForceQuickBuild;
+
+	// Sine
+
+	// Acid handling
+	CHandle<CTFPlayer>		m_hAcidAttacker;
+	float					m_flAcidDamage;
+
+	// I HATE DUPLICATING THIS FROM tf_player_shared.h I'M SORRY -Vruk
+	struct ToxicGooDmg_t
+	{
+		float m_flDamage;
+		bool m_bCritical;
+		CTFPlayer* pAttacker;
+
+		ToxicGooDmg_t()
+		{
+			this->pAttacker = nullptr;
+			this->m_flDamage = 0;
+			this->m_bCritical = false;
+		}
+
+		ToxicGooDmg_t(CTFPlayer* pAttacker, float damage, bool critical)
+		{
+			this->pAttacker = pAttacker;
+			this->m_flDamage = damage;
+			this->m_bCritical = critical;
+		}
+
+		inline bool operator<(const ToxicGooDmg_t& other) const
+		{
+			if (m_flDamage == other.m_flDamage)
+				if (m_bCritical) return false;
+				else return other.m_bCritical;
+
+			return m_flDamage < other.m_flDamage;
+		}
+
+		inline bool operator==(const ToxicGooDmg_t& other) const
+		{
+			return (m_flDamage == other.m_flDamage) && (m_bCritical != other.m_bCritical);
+		}
+
+	};
+
+	CUtlRBTree<ToxicGooDmg_t>* m_treeTouchingToxicGooDamage;
 };
 
 extern short g_sModelIndexFireball;		// holds the index for the fireball
