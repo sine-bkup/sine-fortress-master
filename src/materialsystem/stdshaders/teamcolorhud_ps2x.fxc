@@ -243,7 +243,7 @@ float4 main( PS_INPUT i ) : COLOR
 	#if SOFT_MASK
 		mskUsed = smoothstep( SOFT_MASK_MIN, SOFT_MASK_MAX, f1DistAlphaMask );
 
-		f1FinalAlpha = mskUsed;
+		f1FinalAlpha = mskUsed * f4BaseTexture.a;
 
 	#else
 		mskUsed = f1DistAlphaMask >= 0.5;
