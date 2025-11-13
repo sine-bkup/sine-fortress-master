@@ -185,7 +185,11 @@ public:
 // CTF Flag class.
 //
 DECLARE_AUTO_LIST( ICaptureFlagAutoList );
+#ifdef GAME_DLL
 class CCaptureFlag : public CTFItem, public ICaptureFlagAutoList
+#else
+class CCaptureFlag : public CTFItem, public ICaptureFlagAutoList, CGameEventListener
+#endif
 {
 public:
 
@@ -287,6 +291,8 @@ public:
 
 	virtual void	OnPreDataChanged( DataUpdateType_t updateType );
 	virtual void	OnDataChanged( DataUpdateType_t updateType );
+
+	virtual void	FireGameEvent(IGameEvent* event);
 
 	void			CreateSiren( void );
 	void			DestroySiren( void );

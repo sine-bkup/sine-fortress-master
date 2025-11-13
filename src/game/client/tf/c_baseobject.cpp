@@ -82,6 +82,8 @@ ConVar cl_obj_test_building_damage( "cl_obj_test_building_damage", "-1", FCVAR_C
 //-----------------------------------------------------------------------------
 C_BaseObject::C_BaseObject(  )
 {
+	ListenForGameEvent("colors_updated");
+
 	m_YawPreviewState = YAW_PREVIEW_OFF;
 	m_bBuilding = false;
 	m_bPlacing = false;
@@ -358,6 +360,14 @@ void C_BaseObject::FireEvent( const Vector& origin, const QAngle& angles, int ev
 			}
 		}
 		break;
+	}
+}
+
+void C_BaseObject::FireGameEvent(IGameEvent* event)
+{
+	if (FStrEq(event->GetName(), "colors_updated"))
+	{
+		UpdateGlowEffect();
 	}
 }
 

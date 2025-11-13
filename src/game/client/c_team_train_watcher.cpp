@@ -39,6 +39,10 @@ C_TeamTrainWatcher::C_TeamTrainWatcher()
 	m_flRecedeTime = -1;
 
 #ifdef GLOWS_ENABLE
+
+#ifdef SF_DLL
+	ListenForGameEvent("colors_updated");
+#endif
 	m_pGlowEffect = NULL;
 	m_hGlowEnt = NULL;
 	m_hOldGlowEnt = NULL;
@@ -192,6 +196,16 @@ void C_TeamTrainWatcher::OnDataChanged( DataUpdateType_t updateType )
 	}
 #endif // GLOWS_ENABLE
 }
+
+#if defined(GLOWS_ENABLE) && defined(SF_DLL)
+void C_TeamTrainWatcher::FireGameEvent(IGameEvent* event)
+{
+	if (FStrEq(event->GetName(), "colors_updated"))
+	{
+		UpdateGlowEffect();
+	}
+}
+#endif
 
 //-----------------------------------------------------------------------------
 // Purpose: 

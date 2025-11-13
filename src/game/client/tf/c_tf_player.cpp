@@ -3972,6 +3972,7 @@ C_TFPlayer::C_TFPlayer() :
 	ListenForGameEvent( "player_abandoned_match" );
 	ListenForGameEvent( "rocketpack_launch" );
 	ListenForGameEvent( "rocketpack_landed" );
+	ListenForGameEvent( "colors_updated" );
 
 	//AddPhonemeFile
 	engine->AddPhonemeFile( "scripts/game_sounds_vo_phonemes.txt" );
@@ -11162,6 +11163,10 @@ void C_TFPlayer::FireGameEvent( IGameEvent *event )
 				}
 			}
 		}
+	}
+	else if (FStrEq(event->GetName(), "colors_updated"))
+	{
+		UpdateGlowColor();
 	}
 	BaseClass::FireGameEvent( event );
 }

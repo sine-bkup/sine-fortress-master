@@ -19,6 +19,7 @@
 #include "c_basecombatcharacter.h"
 #include "ihasbuildpoints.h"
 #include <vgui/ILocalize.h>
+#include "GameEventListener.h"
 
 class C_TFPlayer;
 
@@ -32,7 +33,7 @@ DECLARE_AUTO_LIST( IBaseObjectAutoList );
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
-class C_BaseObject : public C_BaseCombatCharacter, public IHasBuildPoints, public ITargetIDProvidesHint, public IBaseObjectAutoList
+class C_BaseObject : public C_BaseCombatCharacter, public IHasBuildPoints, public ITargetIDProvidesHint, public IBaseObjectAutoList, public CGameEventListener
 {
 	DECLARE_CLASS( C_BaseObject, C_BaseCombatCharacter );
 public:
@@ -88,6 +89,8 @@ public:
 	void			SendClientCommand( const char *pCmd );
 
 	virtual void FireEvent( const Vector& origin, const QAngle& angles, int event, const char *options );
+
+	virtual void FireGameEvent(IGameEvent* event);
 
 	// Builder preview...
 	void			ActivateYawPreview( bool enable );

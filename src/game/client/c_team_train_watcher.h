@@ -16,7 +16,7 @@
 #include "glow_outline_effect.h"
 #endif // GLOWS_ENABLE
 
-class C_TeamTrainWatcher : public C_BaseEntity
+class C_TeamTrainWatcher : public C_BaseEntity, CGameEventListener
 {
 	DECLARE_CLASS( C_TeamTrainWatcher, C_BaseEntity );
 public:
@@ -27,6 +27,10 @@ public:
 
 	virtual void OnPreDataChanged( DataUpdateType_t updateType );
 	virtual void OnDataChanged( DataUpdateType_t updateType );
+
+#if defined(GLOWS_ENABLE) && defined(SF_DLL)
+	virtual void FireGameEvent(IGameEvent* event);
+#endif
 
 	virtual void Spawn( void );
 	virtual void UpdateOnRemove( void );

@@ -228,6 +228,8 @@ IMPLEMENT_AUTO_LIST( ICaptureFlagAutoList );
 CCaptureFlag::CCaptureFlag()
 {
 #ifdef CLIENT_DLL
+	ListenForGameEvent("colors_updated");
+
 	m_pGlowTrailEffect = NULL;
 	m_pPaperTrailEffect = NULL;
 	m_pGlowEffect = NULL;
@@ -473,6 +475,14 @@ void CCaptureFlag::OnDataChanged( DataUpdateType_t updateType )
 	}
 
 	CreateSiren();
+}
+
+void CCaptureFlag::FireGameEvent(IGameEvent* event)
+{
+	if (FStrEq(event->GetName(), "colors_updated"))
+	{
+		UpdateGlowEffect();
+	}
 }
 
 //-----------------------------------------------------------------------------

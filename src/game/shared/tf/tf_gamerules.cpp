@@ -17662,15 +17662,35 @@ void CTFGameRules::GetTeamGlowColor( int nTeam, float &r, float &g, float &b )
 {
 	if ( nTeam == TF_TEAM_RED )
 	{
-		r = 0.74f;
-		g = 0.23f;
-		b = 0.23f;
+		if (TFGameRules()->GetRedTeamHasCustomColor())
+		{
+			Vector vecColor = TFGameRules()->GetRedTeamColor() / 255.0f;
+			r = vecColor.x;
+			g = vecColor.y;
+			b = vecColor.z;
+		}
+		else
+		{
+			r = 0.74f;
+			g = 0.23f;
+			b = 0.23f;
+		}
 	}
 	else if ( nTeam == TF_TEAM_BLUE )
 	{
-		r = 0.49f;
-		g = 0.66f;
-		b = 0.77f;
+		if (TFGameRules()->GetBlueTeamHasCustomColor())
+		{
+			Vector vecColor = TFGameRules()->GetBlueTeamColor() / 255.0f;
+			r = vecColor.x;
+			g = vecColor.y;
+			b = vecColor.z;
+		}
+		else
+		{
+			r = 0.49f;
+			g = 0.66f;
+			b = 0.77f;
+		}
 	}
 	else
 	{
