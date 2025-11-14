@@ -337,11 +337,17 @@ void CTFHudEscortProgressBar::SetTeam( int nTeam )
 
 	if ( m_nTeam == TF_TEAM_RED )
 	{
-		pszMaterial = "hud/cart_track_red_opaque";
+		if (TFGameRules() && TFGameRules()->GetRedTeamHasCustomColor())
+			pszMaterial = "hud/cart_track_custom_opaque";
+		else
+			pszMaterial = "hud/cart_track_red_opaque";
 	}
 	else if ( m_nTeam == TF_TEAM_BLUE )
 	{
-		pszMaterial = "hud/cart_track_blue_opaque";
+		if (TFGameRules() && TFGameRules()->GetBlueTeamHasCustomColor())
+			pszMaterial = "hud/cart_track_custom_opaque";
+		else
+			pszMaterial = "hud/cart_track_blue_opaque";
 	}
 
 	m_iTexture = vgui::surface()->DrawGetTextureId( pszMaterial );
@@ -408,6 +414,7 @@ CTFHudEscort::CTFHudEscort( Panel *parent, const char *name ) : EditablePanel( p
 	ListenForGameEvent( "teamplay_round_start" );
 	ListenForGameEvent( "localplayer_respawn" );
 	ListenForGameEvent( "localplayer_changeteam" );
+	ListenForGameEvent( "colors_updated" );
 
 	m_pEscortItemPanel = new EditablePanel( this, "EscortItemPanel" );
 
@@ -416,13 +423,13 @@ CTFHudEscort::CTFHudEscort( Panel *parent, const char *name ) : EditablePanel( p
 	m_pSpeedBackwards = new ImagePanel( m_pEscortItemPanel, "Speed_Backwards" );
 	m_pCapPlayerImage = new ImagePanel( m_pEscortItemPanel, "CapPlayerImage" );
 	m_pCapNumPlayers = new CExLabel( m_pEscortItemPanel, "CapNumPlayers", "" );
-	m_pEscortItemImage = new ImagePanel( m_pEscortItemPanel, "EscortItemImage" );
-	m_pEscortItemImageBottom = new ImagePanel( m_pEscortItemPanel, "EscortItemImageBottom" );
+	m_pEscortItemImage = new CTFImagePanel( m_pEscortItemPanel, "EscortItemImage" );
+	m_pEscortItemImageBottom = new CTFImagePanel( m_pEscortItemPanel, "EscortItemImageBottom" );
 	m_pBlocked = new ImagePanel( m_pEscortItemPanel, "Blocked" );
 
 	m_pEscortItemImageAlert = new ImagePanel( m_pEscortItemPanel, "EscortItemImageAlert" );
 	
-	m_pHomeCPIcon = new ImagePanel( this, "HomeCPIcon" );
+	m_pHomeCPIcon = new CTFImagePanel( this, "HomeCPIcon" );
 
 	m_pCPTemplate = new ImagePanel( this, "SimpleControlPointTemplate" );
 
@@ -442,7 +449,8 @@ CTFHudEscort::CTFHudEscort( Panel *parent, const char *name ) : EditablePanel( p
 
 	m_flRecedeTime = 0;
 
-	m_nTeam = TF_TEAM_BLUE; // blue team by default
+	SetTeam(TF_TEAM_BLUE); // blue team by default
+	
 	m_bTopPanel = true;
 
 	m_bAlarm = false;
@@ -572,13 +580,19 @@ void CTFHudEscort::ApplySchemeSettings( IScheme *pScheme )
 		pConditions = new KeyValues( "conditions" );
 		if ( pConditions )
 		{
-			if ( m_nTeam == TF_TEAM_RED )
+			if (m_nTeam == TF_TEAM_RED)
 			{
-				AddSubKeyNamed( pConditions, "if_team_red" );
+				if (TFGameRules() && TFGameRules()->GetRedTeamHasCustomColor())
+					AddSubKeyNamed(pConditions, "if_team_custom");
+				else
+					AddSubKeyNamed(pConditions, "if_team_red");
 			}
 			else
 			{
-				AddSubKeyNamed( pConditions, "if_team_blue" );
+				if (TFGameRules() && TFGameRules()->GetBlueTeamHasCustomColor())
+					AddSubKeyNamed(pConditions, "if_team_custom");
+				else
+					AddSubKeyNamed(pConditions, "if_team_blue");
 			}
 
 			if ( m_bMultipleTrains )
@@ -587,11 +601,17 @@ void CTFHudEscort::ApplySchemeSettings( IScheme *pScheme )
 
 				if ( m_nTeam == TF_TEAM_RED )
 				{
-					AddSubKeyNamed( pConditions, "if_multiple_trains_red" );
+					if (TFGameRules() && TFGameRules()->GetRedTeamHasCustomColor())
+						AddSubKeyNamed(pConditions, "if_multiple_trains_custom");
+					else
+						AddSubKeyNamed(pConditions, "if_multiple_trains_red");
 				}
 				else
 				{
-					AddSubKeyNamed( pConditions, "if_multiple_trains_blue" );
+					if (TFGameRules() && TFGameRules()->GetBlueTeamHasCustomColor())
+						AddSubKeyNamed(pConditions, "if_multiple_trains_custom");
+					else
+						AddSubKeyNamed(pConditions, "if_multiple_trains_blue");
 				}
 
 				if ( m_bTopPanel )
@@ -612,11 +632,17 @@ void CTFHudEscort::ApplySchemeSettings( IScheme *pScheme )
 
 					if ( m_nTeam == TF_TEAM_RED )
 					{
-						AddSubKeyNamed( pConditions, "if_single_with_hills_red" );
+						if (TFGameRules() && TFGameRules()->GetRedTeamHasCustomColor())
+							AddSubKeyNamed(pConditions, "if_single_with_hills_custom");
+						else
+							AddSubKeyNamed(pConditions, "if_single_with_hills_red");
 					}
 					else
 					{
-						AddSubKeyNamed( pConditions, "if_single_with_hills_blue" );
+						if (TFGameRules() && TFGameRules()->GetBlueTeamHasCustomColor())
+							AddSubKeyNamed(pConditions, "if_single_with_hills_custom");
+						else
+							AddSubKeyNamed(pConditions, "if_single_with_hills_blue");
 					}
 				}
 			}
@@ -625,6 +651,8 @@ void CTFHudEscort::ApplySchemeSettings( IScheme *pScheme )
 
 	// load control settings...
 	LoadControlSettings( "resource/UI/ObjectiveStatusEscort.res", NULL, NULL, pConditions );
+
+	SetTeam(m_nTeam);
 
 	UpdateCPImages();
 
@@ -996,6 +1024,11 @@ void CTFHudEscort::FireGameEvent( IGameEvent *event )
 		// reset the alarm (will be restarted in OnThink() if needed)
 		m_bAlarm = false;
 		UpdateAlarmAnimations();
+	}
+	else if ( FStrEq( "colors_updated", eventName ) )
+	{
+		InvalidateLayout(false, true);
+		m_pProgressBar->SetTeam(m_nTeam);
 	}
 }
 

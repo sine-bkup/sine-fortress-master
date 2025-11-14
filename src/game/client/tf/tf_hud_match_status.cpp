@@ -65,6 +65,7 @@ CRoundCounterPanel::CRoundCounterPanel( Panel *parent, const char *panelName )
 	ListenForGameEvent( "winpanel_show_scores" );
 	ListenForGameEvent( "stop_watch_changed" );
 	ListenForGameEvent( "teamplay_round_start" );
+	ListenForGameEvent( "colors_updated" );
 }
 
 //-----------------------------------------------------------------------------
@@ -89,7 +90,14 @@ void CRoundCounterPanel::ApplySchemeSettings(IScheme *pScheme)
 {
 	BaseClass::ApplySchemeSettings( pScheme );
 
-	LoadControlSettings( "resource/UI/HudRoundCounter.res" );
+	KeyValues* pConditions = NULL;
+	if (TFGameRules() && (TFGameRules()->GetBlueTeamHasCustomColor() || TFGameRules()->GetRedTeamHasCustomColor()))
+	{
+		pConditions = new KeyValues("conditions");
+		AddSubKeyNamed(pConditions, "if_custom_colors_enabled");
+	}
+
+	LoadControlSettings( "resource/UI/HudRoundCounter.res", NULL, NULL, pConditions);
 }
 
 //-----------------------------------------------------------------------------
@@ -233,6 +241,10 @@ void CRoundCounterPanel::FireGameEvent(IGameEvent * event )
 		   || FStrEq( event->GetName(), "teamplay_round_start" ) ) // Make sure we're accurate when the round starts in case the hud event didnt happen
 	{
 		InvalidateLayout( true );
+	}
+	else if (FStrEq(event->GetName(), "colors_updated")) // Change materials if need be for custom colors
+	{
+		InvalidateLayout(false, true);
 	}
 }
 

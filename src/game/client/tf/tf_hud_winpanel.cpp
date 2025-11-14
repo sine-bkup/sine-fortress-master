@@ -145,6 +145,37 @@ void CTFWinPanel::FireGameEvent( IGameEvent * event )
 			}
 		}
 
+		bool bBlueUsesCustomColor = false;
+		bool bRedUsesCustomColor = false;
+		if (TFGameRules())
+		{
+			bBlueUsesCustomColor = TFGameRules()->GetBlueTeamHasCustomColor();
+			bRedUsesCustomColor = TFGameRules()->GetRedTeamHasCustomColor();
+		}
+
+		const char* szBlueBorder = "TFFatLineBorderBlueBGMoreOpaque";
+		const char* szRedBorder = "TFFatLineBorderRedBGMoreOpaque";
+		if (bUseMoreOpaqueBorder)
+		{
+			if (bBlueUsesCustomColor)
+				szBlueBorder = "TFFatLineBorderCustomBlueBGMoreOpaque";
+
+			if (bRedUsesCustomColor)
+				szRedBorder = "TFFatLineBorderCustomRedBGMoreOpaque";
+		}
+		else
+		{
+			if (bBlueUsesCustomColor)
+				szBlueBorder = "TFFatLineBorderCustomBlueBG";
+			else
+				szBlueBorder = "TFFatLineBorderBlueBG";
+
+			if (bRedUsesCustomColor)
+				szRedBorder = "TFFatLineBorderCustomRedBG";
+			else
+				szRedBorder = "TFFatLineBorderRedBG";
+		}
+
 		// non-final rounds of stopwatch mode should say something different
 		CTeamRoundTimer *pTimer = NULL;
 		if ( TFGameRules() && TFGameRules()->IsInTournamentMode() && TFGameRules()->IsInStopWatch() )
@@ -189,8 +220,8 @@ void CTFWinPanel::FireGameEvent( IGameEvent * event )
 		if( !pBlueBGPanel || !pRedBGPanel )
 			return;
 
-		pBlueBGPanel->SetBorder( pScheme->GetBorder( bUseMoreOpaqueBorder ? "TFFatLineBorderBlueBGMoreOpaque" : "TFFatLineBorderBlueBG" ) );
-		pRedBGPanel->SetBorder( pScheme->GetBorder( bUseMoreOpaqueBorder ? "TFFatLineBorderRedBGMoreOpaque" : "TFFatLineBorderRedBG" ) ) ;
+		pBlueBGPanel->SetBorder( pScheme->GetBorder(szBlueBorder));
+		pRedBGPanel->SetBorder( pScheme->GetBorder(szRedBorder) ) ;
 
 		// we want to suppress the winreason for sd_doomsday_event and plr_hightower_event
 		if ( TFGameRules() )
@@ -226,14 +257,14 @@ void CTFWinPanel::FireGameEvent( IGameEvent * event )
 		switch ( iWinningTeam )
 		{
 		case TF_TEAM_BLUE:
-			pBGPanel->SetBorder( pScheme->GetBorder( bUseMoreOpaqueBorder ? "TFFatLineBorderBlueBGMoreOpaque" : "TFFatLineBorderBlueBG" ) );
+			pBGPanel->SetBorder( pScheme->GetBorder(szBlueBorder) );
 			pTopPlayersLabel = g_pVGuiLocalize->Find( "#Winpanel_BlueMVPs" );
 			pLocalizedTeamName = pBlueTeamName;
 			g_pVGuiLocalize->ConstructString_safe( wzTeamWin, g_pVGuiLocalize->Find( pWinTeamLabel ), 2, pLocalizedTeamName, g_pVGuiLocalize->Find( "#Winpanel_Team1" ) );
 			pTeamLabel = wzTeamWin;
 			break;
 		case TF_TEAM_RED:
-			pBGPanel->SetBorder( pScheme->GetBorder( bUseMoreOpaqueBorder ? "TFFatLineBorderRedBGMoreOpaque" : "TFFatLineBorderRedBG" ) );
+			pBGPanel->SetBorder( pScheme->GetBorder(szRedBorder) );
 			pTopPlayersLabel = g_pVGuiLocalize->Find( "#Winpanel_RedMVPs" );
 			pLocalizedTeamName = pRedTeamName;
 			break;

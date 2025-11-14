@@ -22,6 +22,7 @@
 #include "proxyentity.h"
 #include "materialsystem/imaterial.h"
 #include "materialsystem/imaterialvar.h"
+#include <sf/sf_vruksstupiduihack.h>
 
 class CEscortHillPanel : public vgui::Panel, public CGameEventListener
 {
@@ -118,6 +119,13 @@ public:
 		return BaseClass::IsVisible();
 	}
 
+	virtual void PaintBackground()
+	{
+		VruksStupidUIHack::SetTeamOverride(ObjectiveResource()->GetOwningTeam(m_iCPIndex));
+		BaseClass::PaintBackground();
+		VruksStupidUIHack::SetTeamOverride(TEAM_INVALID);
+	}
+
 	void SetCPIndex( int index )
 	{
 		m_iCPIndex = index;
@@ -127,6 +135,11 @@ public:
 	{
 		int iOwner = ObjectiveResource()->GetOwningTeam( m_iCPIndex );
 		bool bMultipleTrains = ( TFGameRules() && TFGameRules()->HasMultipleTrains() ) ? true : false;
+		bool bHasCustomColor =	(TFGameRules() && (
+									(TFGameRules()->GetBlueTeamHasCustomColor() && iOwner == TF_TEAM_BLUE)
+								||	(TFGameRules()->GetRedTeamHasCustomColor() && iOwner == TF_TEAM_RED)
+									)
+								);
 
 		const char *szMatName = "";
 		switch ( iOwner )
@@ -134,21 +147,33 @@ public:
 		case TF_TEAM_BLUE:
 			if ( !bMultipleTrains && !m_bForceOpaque )
 			{
-				szMatName = "hud/cart_point_blue";
+				if (bHasCustomColor)
+					szMatName = "hud/cart_point_custom";
+				else
+					szMatName = "hud/cart_point_blue";
 			}
 			else
 			{
-				szMatName = "hud/cart_point_blue_opaque";
+				if (bHasCustomColor)
+					szMatName = "hud/cart_point_custom_opaque";
+				else
+					szMatName = "hud/cart_point_blue_opaque";
 			}
 			break;
 		case TF_TEAM_RED:
 			if ( !bMultipleTrains && !m_bForceOpaque )
 			{
-				szMatName = "hud/cart_point_red";
+				if (bHasCustomColor)
+					szMatName = "hud/cart_point_custom";
+				else
+					szMatName = "hud/cart_point_red";
 			}
 			else
 			{
-				szMatName = "hud/cart_point_red_opaque";
+				if (bHasCustomColor)
+					szMatName = "hud/cart_point_custom_opaque";
+				else
+					szMatName = "hud/cart_point_red_opaque";
 			}
 			break;
 		default:
@@ -206,6 +231,29 @@ public:
 		{
 			m_pProgressBar->SetTeam( m_nTeam );
 		}
+		if (m_pEscortItemImage)
+		{
+			m_pEscortItemImage->m_iBGTeamFromSettings = m_nTeam;
+			m_pEscortItemImage->SetBGTeam(m_nTeam);
+		}
+		if (m_pEscortItemImageBottom)
+		{
+			if (m_nTeam == TF_TEAM_BLUE)
+			{
+				m_pEscortItemImageBottom->m_iBGTeamFromSettings = TF_TEAM_RED;
+				m_pEscortItemImageBottom->SetBGTeam(TF_TEAM_RED);
+			}
+			else if(m_nTeam == TF_TEAM_RED)
+			{
+				m_pEscortItemImageBottom->m_iBGTeamFromSettings = TF_TEAM_BLUE;
+				m_pEscortItemImageBottom->SetBGTeam(TF_TEAM_BLUE);
+			}
+		}
+		if (m_pHomeCPIcon)
+		{
+			m_pHomeCPIcon->m_iBGTeamFromSettings = m_nTeam;
+			m_pHomeCPIcon->SetBGTeam(m_nTeam);
+		}
 	}
 
 	void SetTopPanel( bool bTopPanel )
@@ -247,9 +295,9 @@ private:
 
 	float m_flRecedeTime;
 
-	vgui::ImagePanel *m_pEscortItemImage;
-	vgui::ImagePanel *m_pEscortItemImageBottom;
-	vgui::ImagePanel *m_pHomeCPIcon;
+	CTFImagePanel *m_pEscortItemImage;
+	CTFImagePanel *m_pEscortItemImageBottom;
+	CTFImagePanel *m_pHomeCPIcon;
 
 	int m_nTeam;
 

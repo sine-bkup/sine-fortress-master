@@ -43,9 +43,11 @@ private:
 	CMaterialReference	m_BlueMaterial;
 	CMaterialReference	m_NeutralMaterial;
 	CMaterialReference	m_NeutralRedMaterial;
+	CMaterialReference	m_CustomMaterial;
 
 	CMaterialReference	m_RedMaterialNoArrow;
 	CMaterialReference	m_BlueMaterialNoArrow;
+	CMaterialReference	m_CustomMaterialNoArrow;
 
 	bool				m_bUseRed;
 	float				m_flNextColorSwitch;

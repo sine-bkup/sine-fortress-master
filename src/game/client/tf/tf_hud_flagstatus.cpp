@@ -38,6 +38,7 @@
 #include "view.h"
 #include "prediction.h"
 #include "tf_logic_robot_destruction.h"
+#include <sf/sf_vruksstupiduihack.h>
 
 using namespace vgui;
 
@@ -61,9 +62,11 @@ CTFArrowPanel::CTFArrowPanel( Panel *parent, const char *name ) : vgui::Panel( p
 	m_BlueMaterial.Init( "hud/objectives_flagpanel_compass_blue", TEXTURE_GROUP_VGUI ); 
 	m_NeutralMaterial.Init( "hud/objectives_flagpanel_compass_grey", TEXTURE_GROUP_VGUI ); 
 	m_NeutralRedMaterial.Init( "hud/objectives_flagpanel_compass_grey_with_red", TEXTURE_GROUP_VGUI ); 
+	m_CustomMaterial.Init( "hud/objectives_flagpanel_compass_custom", TEXTURE_GROUP_VGUI	);
 
 	m_RedMaterialNoArrow.Init( "hud/objectives_flagpanel_compass_red_noArrow", TEXTURE_GROUP_VGUI ); 
 	m_BlueMaterialNoArrow.Init( "hud/objectives_flagpanel_compass_blue_noArrow", TEXTURE_GROUP_VGUI ); 
+	m_CustomMaterialNoArrow.Init( "hud/objectives_flagpanel_compass_custom_noArrow", TEXTURE_GROUP_VGUI	);
 
 	m_pMaterial = m_NeutralMaterial;
 	m_bUseRed = false;
@@ -122,7 +125,10 @@ void CTFArrowPanel::OnTick( void )
 		// figure out what material we need to use
 		if ( pEnt->GetTeamNumber() == TF_TEAM_RED )
 		{
-			m_pMaterial = m_RedMaterial;
+			if (TFGameRules() && TFGameRules()->GetRedTeamHasCustomColor())
+				m_pMaterial = m_CustomMaterial;
+			else
+				m_pMaterial = m_RedMaterial;
 
 			if ( pLocalPlayer && ( pLocalPlayer->GetObserverMode() == OBS_MODE_IN_EYE ) )
 			{
@@ -134,14 +140,20 @@ void CTFArrowPanel::OnTick( void )
 					C_TFPlayer *pTarget = static_cast< C_TFPlayer* >( pTargetEnt );
 					if ( pTarget->HasTheFlag() && ( pTarget->GetItem() == pEnt ) )
 					{
-						m_pMaterial = m_RedMaterialNoArrow;
+						if (TFGameRules() && TFGameRules()->GetRedTeamHasCustomColor())
+							m_pMaterial = m_CustomMaterialNoArrow;
+						else
+							m_pMaterial = m_RedMaterialNoArrow;
 					}
 				}
 			}
 		}
 		else if ( pEnt->GetTeamNumber() == TF_TEAM_BLUE )
 		{
-			m_pMaterial = m_BlueMaterial;
+			if (TFGameRules() && TFGameRules()->GetBlueTeamHasCustomColor())
+				m_pMaterial = m_CustomMaterial;
+			else
+				m_pMaterial = m_BlueMaterial;
 
 			if ( pLocalPlayer && ( pLocalPlayer->GetObserverMode() == OBS_MODE_IN_EYE ) )
 			{
@@ -153,7 +165,10 @@ void CTFArrowPanel::OnTick( void )
 					C_TFPlayer *pTarget = static_cast< C_TFPlayer* >( pTargetEnt );
 					if ( pTarget->HasTheFlag() && ( pTarget->GetItem() == pEnt ) )
 					{
-						m_pMaterial = m_BlueMaterialNoArrow;
+						if (TFGameRules() && TFGameRules()->GetBlueTeamHasCustomColor())
+							m_pMaterial = m_CustomMaterialNoArrow;
+						else
+							m_pMaterial = m_BlueMaterialNoArrow;
 					}
 				}
 			}
@@ -211,6 +226,10 @@ float CTFArrowPanel::GetAngleRotation( void )
 //-----------------------------------------------------------------------------
 void CTFArrowPanel::Paint()
 {
+	C_BaseEntity* pEnt = m_hEntity.Get();
+	if (pEnt)
+		VruksStupidUIHack::SetTeamOverride(pEnt->GetTeamNumber());
+
 	int x = 0;
 	int y = 0;
 	ipanel()->GetAbsPos( GetVPanel(), x, y );
@@ -257,6 +276,9 @@ void CTFArrowPanel::Paint()
 
 	pMesh->Draw();
 	pRenderContext->PopMatrix();
+
+	if (pEnt)
+		VruksStupidUIHack::SetTeamOverride(TEAM_INVALID);
 }
 
 //-----------------------------------------------------------------------------
@@ -470,6 +492,23 @@ void CTFHudFlagObjectives::ApplySchemeSettings( IScheme *pScheme )
 					AddSubKeyNamed( pConditions, "if_specialdelivery" );
 				}
 			}
+		}
+	}
+
+	if (TFGameRules())
+	{
+		if (TFGameRules()->GetBlueTeamHasCustomColor())
+		{
+			if(!pConditions)
+				pConditions = new KeyValues("conditions");
+			AddSubKeyNamed(pConditions, "if_blue_has_custom_color");
+		}
+
+		if (TFGameRules()->GetRedTeamHasCustomColor())
+		{
+			if (!pConditions)
+				pConditions = new KeyValues("conditions");
+			AddSubKeyNamed(pConditions, "if_red_has_custom_color");
 		}
 	}
 	
