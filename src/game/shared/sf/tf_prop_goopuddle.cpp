@@ -92,7 +92,7 @@ void CTFPropGooPuddle::RecalculateBounds()
 	{
 		puddleinfo_t* info = m_puddles[i];
 
-		if (!info || info->finishedSpreading)
+		if (!info)
 			continue;
 
 		Vector puddlePos = info->pos - GetAbsOrigin();
@@ -306,7 +306,7 @@ void CTFPropGooPuddle::PuddleThink()
 				info->finishedSpreading = false;
 				info->lifetime.Start(m_flLifetime);
 
-				m_puddles[i] = info;
+				m_puddles[m_PuddleCount] = info;
 
 				m_vecPuddlePos.Set(i, nextPos);
 				m_PuddleCount++;
@@ -392,9 +392,10 @@ bool CTFPropGooPuddle::CreatePuddle(Vector parentPosition, int *traceCount)
 
 	info->pos = nextPos;
 	info->lifetime.Start(m_flLifetime);
-	m_puddles[m_PuddleCount + 1] = info;
+	info->finishedSpreading = false;
+	m_puddles[m_PuddleCount] = info;
 
-	m_vecPuddlePos.Set(m_PuddleCount + 1, nextPos);
+	m_vecPuddlePos.Set(m_PuddleCount, nextPos);
 
 	return true;
 }
@@ -423,7 +424,10 @@ int CTFPropGooPuddle::Spread()
 			continue;
 
 		if (!CreatePuddle(parentInfo->pos, &traceCount))
+		{
+			parentInfo->finishedSpreading = true;
 			continue;
+		}
 
 		m_PuddleCount++;
 		newPuddles++;
