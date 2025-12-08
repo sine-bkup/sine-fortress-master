@@ -44,12 +44,12 @@ END_DATADESC()
 #define TF_WEAPON_GOOGUN_CHARGE_UP_SOUND	"Weapon_GooGun.Charge"
 #define TF_WEAPON_GOOGUN_CHARGE_DOWN_SOUND	"Weapon_GooGun.DisCharge"
 
-ConVar sf_googun_ammo_cost_toxic_max("sf_googun_ammo_cost_toxic", "40", FCVAR_REPLICATED, "The maximum ammo the googuns use when fully charged");
+ConVar sf_googun_ammo_cost_toxic_max("sf_googun_ammo_cost_toxic", "20", FCVAR_REPLICATED, "The maximum ammo the googuns use when fully charged");
 ConVar sf_googun_ammo_cost_movement("sf_googun_ammo_cost_movement", "65", FCVAR_REPLICATED, "The amount of ammo a googun will use to fire a movement goo");
 ConVar sf_googun_goo_max_toxic("sf_googun_goo_max_toxic", "3", FCVAR_REPLICATED, "The number of toxic goos that a scientist can have at one time");
 ConVar sf_googun_goo_max_movement("sf_googun_goo_max_movement", "4", FCVAR_REPLICATED, "The number of movement goos that a scientist can have at one time", true, 1.0f, false, 0.0f);
 ConVar sf_googun_required_charge_percent("sf_googun_required_charge_percent", "0.0", FCVAR_REPLICATED, "The required percent charge of a googun before a goo projectile can be fired", true, 0.0, true, 1.0);
-ConVar sf_googun_max_charge_time("sf_googun_max_charge_time", "3", FCVAR_REPLICATED, "The time it takes to fully charge the googun", true, 0, false, 0);
+ConVar sf_googun_max_charge_time("sf_googun_max_charge_time", "2.5", FCVAR_REPLICATED, "The time it takes to fully charge the googun", true, 0, false, 0);
 ConVar sf_googun_goo_lifetime_max("sf_googun_goo_lifetime_max", "12.0", FCVAR_REPLICATED, "The length of time in seconds that a full charged goo will stay on the ground before disappearing");
 ConVar sf_googun_goo_lifetime_min("sf_googun_goo_lifetime_min", "2", FCVAR_REPLICATED, "The length of time in seconds that a minimally charged goo will stay on the ground before disappearing");
 
