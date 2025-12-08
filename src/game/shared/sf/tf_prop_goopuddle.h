@@ -83,6 +83,7 @@ public:
 	void				RecalculateBounds();
 	virtual void		StartTouch(CBaseEntity* pEntity) OVERRIDE;
 	virtual void		EndTouch(CBaseEntity* pEntity) OVERRIDE;
+	virtual bool		TestCollision(const Ray_t& ray, unsigned int fContentsMask, trace_t& tr);
 	virtual void		PerformCustomPhysics(Vector* pNewPosition, Vector* pNewVelocity, QAngle* pNewAngles, QAngle* pNewAngVelocity);
 	virtual void		RemoveGooEffect(CBaseEntity* pEntity);
 	virtual void		RemoveAllEffects();

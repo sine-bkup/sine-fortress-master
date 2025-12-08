@@ -68,8 +68,8 @@ void CTFPropGooPuddle::Spawn()
 	SetThink(&CTFPropGooPuddle::PuddleThink);
 	SetNextThink(gpGlobals->curtime);
 
-	SetSolid(SOLID_BBOX);
-	AddSolidFlags(FSOLID_NOT_SOLID | FSOLID_TRIGGER);
+	SetSolid(SOLID_CUSTOM);
+	AddSolidFlags(FSOLID_NOT_SOLID | FSOLID_TRIGGER | FSOLID_FORCE_WORLD_ALIGNED);
 	// Since goo puddles don't use a model, we need to force it to transmit the entity
 	AddEFlags(EFL_FORCE_CHECK_TRANSMIT);
 
@@ -201,12 +201,65 @@ void CTFPropGooPuddle::EndTouch(CBaseEntity* pEntity)
 	RemoveGooEffect(pEntity);
 }
 
+bool CTFPropGooPuddle::TestCollision(const Ray_t& ray, unsigned int fContentsMask, trace_t& tr)
+{
+	if(GetGooType() == TF_GOO_JUMP)
+	{
+		bool bIsOppositeTeam = ((fContentsMask & CONTENTS_BLUETEAM) && GetTeamNumber() == TF_TEAM_BLUE) || ((fContentsMask & CONTENTS_REDTEAM) && GetTeamNumber() == TF_TEAM_RED);
+		switch(sf_goo_team_requirements.GetInt())
+		{
+			case 1:
+				if(bIsOppositeTeam)
+					return false;
+				break;
+			case 2:
+				if(!bIsOppositeTeam)
+					return false;
+				break;
+		}
+	}
+	else
+	{
+		bool bIsOppositeTeam = ((fContentsMask & CONTENTS_BLUETEAM) && GetTeamNumber() == TF_TEAM_BLUE) || ((fContentsMask & CONTENTS_REDTEAM) && GetTeamNumber() == TF_TEAM_RED);
+		if(!bIsOppositeTeam)
+			return false;
+	}
+
+	Vector puddleMins, puddleMaxs;
+	puddleMins = Vector(-PUDDLE_MAX_HALF_WIDTH, -PUDDLE_MAX_HALF_WIDTH, 0);
+	puddleMaxs = Vector(PUDDLE_MAX_HALF_WIDTH, PUDDLE_MAX_HALF_WIDTH, PUDDLE_MAX_HEIGHT);
+
+
+	CPhysCollide* collide = physcollision->BBoxToCollide(puddleMins, puddleMaxs);
+
+	bool bCollided = false;
+	for (int i = 0; i < m_PuddleCount; i++)
+	{
+		puddleinfo_t* puddle = m_puddles[i];
+		
+		physcollision->TraceBox(ray, collide, puddle->pos, vec3_angle, &tr);
+
+		if (tr.DidHit())
+		{
+			debugoverlay->AddBoxOverlay(puddle->pos, puddleMins, puddleMaxs, vec3_angle, 255, 0, 0, 125, 0.5f);
+			bCollided = true;
+			tr.m_pEnt = this;
+			break;
+		}
+	}
+	
+	return bCollided;
+}
+
+// We don't need to do anything here, the goo puddle is set to MOVETYPE_CUSTOM and the BaseEntity function for
+// MOVETYPE_CUSTOM runs PhysicsTouchTriggers for us, this is commented out to prevent it running twice
 void CTFPropGooPuddle::PerformCustomPhysics(Vector* pNewPosition, Vector* pNewVelocity, QAngle* pNewAngles, QAngle* pNewAngVelocity)
 {
-	Vector prevOrigin;
+	
+	/* Vector prevOrigin;
 	VectorCopy(GetAbsOrigin(), prevOrigin);
 
-	PhysicsTouchTriggers(&prevOrigin);
+	PhysicsTouchTriggers(&prevOrigin); */
 }
 
 void CTFPropGooPuddle::RemoveGooEffect(CBaseEntity* pEntity)
