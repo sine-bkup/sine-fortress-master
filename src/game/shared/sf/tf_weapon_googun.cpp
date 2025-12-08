@@ -381,7 +381,7 @@ void CTFGooGun::FireGoo( int GooType )
 	{
 		case TF_GOO_TOXIC:
 			// Charged ammo to remove
-			iAmmoToRemove = Ceil2Int(flPercentageCharged * (sf_googun_ammo_cost_toxic_max.GetInt() - 1));
+			iAmmoToRemove = Ceil2Int(flPercentageCharged * (float)sf_googun_ammo_cost_toxic_max.GetInt());
 			break;
 		case TF_GOO_JUMP:
 			// Remove a flat 75
