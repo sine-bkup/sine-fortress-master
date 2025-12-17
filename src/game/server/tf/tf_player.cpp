@@ -4135,7 +4135,9 @@ void CTFPlayer::Regenerate( bool bRefillHealthAndAmmo /*= true*/ )
 			m_Shared.RemoveCond(TF_COND_ACID_BURN);
 		}
 		if (m_Shared.InCond(TF_COND_JUMP_GOO))
+		{
 			m_Shared.RemoveCond(TF_COND_JUMP_GOO);
+		}
 
 
 		m_Shared.SetSpyCloakMeter( 100.0f );

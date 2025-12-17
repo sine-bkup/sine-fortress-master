@@ -535,9 +535,9 @@ void C_TFProjectile_Goo::OnDataChanged( DataUpdateType_t updateType )
 //-----------------------------------------------------------------------------
 void C_TFProjectile_Goo::CreateTrails( void )
 {
-	if ( IsDormant() )
+	if (IsDormant()) 
 		return;
-
+	
 	const char* pszEffectName;
 	if (GetTeamNumber() == TF_TEAM_RED)
 		pszEffectName = "goo_trail_red";

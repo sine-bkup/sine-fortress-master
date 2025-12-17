@@ -113,6 +113,7 @@ public:
 	CTFGameMovement(); 
 
 	virtual void PlayerMove();
+	virtual void PlayerLandGoo(CTFPlayer* player); //for when the player lands after getting on the jump goo
 	virtual unsigned int PlayerSolidMask( bool brushOnly = false );
 	virtual void ProcessMovement( CBasePlayer *pBasePlayer, CMoveData *pMove );
 	virtual bool CanAccelerate();
@@ -144,6 +145,8 @@ public:
 	virtual void PlayerRoughLandingEffects( float fvol );
 
 	virtual void HandleDuckingSpeedCrop( void );
+
+	bool m_bJumpGooLaunch = false; //check for if player jumped from jump goo (for sound later)
 protected:
 
 	virtual void CheckWaterJump( void );
@@ -192,7 +195,6 @@ CTFGameMovement::CTFGameMovement()
 {
 	m_pTFPlayer = NULL;
 	m_isPassingThroughEnemies = false;
-
 }
 
 //----------------------------------------------------------------------------------------
@@ -1163,6 +1165,19 @@ void CTFGameMovement::ToggleParachute()
 	}
 }
 
+void CTFGameMovement::PlayerLandGoo(CTFPlayer* player) {
+	if (!player)
+		return;
+	player->EmitSound("Weapon_RocketPack.Land"); //landing sound after getting on the jump goo.
+
+	//if (player->m_Shared.InCond(TF_COND_JUMP_GOO))
+	//{
+	//	player->EmitSound("Weapon_RocketPack.Land"); //landing sound after getting on the jump goo.
+	//	//player->m_Shared.RemoveCond(TF_COND_JUMP_GOO);
+	//}
+
+}
+
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
@@ -1319,13 +1334,19 @@ bool CTFGameMovement::CheckJumpButton()
 	if (m_pTFPlayer->m_Shared.InCond(TF_COND_JUMP_GOO))
 	{
 #ifdef GAME_DLL
+		//m_pTFPlayer->EmitSound("Weapon_RocketPack.Land"); //landing sound after getting on the jump goo.
 		if (sf_goo_falldamage_forgiveness.GetBool())
 			m_pTFPlayer->DisableNextFallDamage();
+		
 #endif
+		m_bJumpGooLaunch = true;
 		flJumpMod += sf_goojump_multi.GetFloat();
 		mv->m_vecVelocity[0] *= sf_goojump_speed.GetFloat();
 		mv->m_vecVelocity[1] *= sf_goojump_speed.GetFloat();
 		m_pTFPlayer->EmitSound("Weapon_GooGun.GooJump");
+
+		
+
 	}
 
 	if ( m_pTFPlayer->m_Shared.GetCarryingRuneType() == RUNE_AGILITY )
@@ -1334,10 +1355,8 @@ bool CTFGameMovement::CheckJumpButton()
 	}
 	
 	float flMul = ( 289.0f * flJumpMod ) * flGroundFactor;
-
 	// Save the current z velocity.
 	float flStartZ = mv->m_vecVelocity[2];
-
 	// Acclerate upward
 	if ( (  player->m_Local.m_bDucking ) || (  player->GetFlags() & FL_DUCKING ) )
 	{
@@ -1354,14 +1373,13 @@ bool CTFGameMovement::CheckJumpButton()
 	{
 		mv->m_vecVelocity[2] += flMul;  // 2 * gravity * jump_height * ground_factor
 	}
-
 	// Apply gravity.
 	FinishGravity();
 
 	// Save the output data for the physics system to react to if need be.
 	mv->m_outJumpVel.z += mv->m_vecVelocity[2] - flStartZ;
 	mv->m_outStepHeight += 0.15f;
-
+	
 	// Flag that we jumped and don't jump again until it is released.
 	mv->m_nOldButtons |= IN_JUMP;
 	return true;
@@ -2967,6 +2985,15 @@ void CTFGameMovement::SetGroundEntity( trace_t *pm )
 	if ( m_pTFPlayer->m_Shared.InCond( TF_COND_HALLOWEEN_KART ) && !m_pTFPlayer->GetGroundEntity() && pm && pm->m_pEnt )
 	{
 		m_pTFPlayer->EmitSound( "BumperCar.JumpLand" );
+	}
+
+	if(m_bJumpGooLaunch && !m_pTFPlayer->GetGroundEntity() && pm && pm->m_pEnt)
+	{
+#ifdef GAME_DLL
+		PlayerLandGoo(m_pTFPlayer);
+#endif
+		m_pTFPlayer->EmitSound("Weapon_RocketPack.Land"); //landing sound after getting on the jump goo.
+		m_bJumpGooLaunch = false;
 	}
 
 	BaseClass::SetGroundEntity( pm );

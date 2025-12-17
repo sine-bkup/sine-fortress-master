@@ -62,6 +62,7 @@ ConVar sf_goo_max_vel("sf_goo_max_vel", "1200", FCVAR_REPLICATED, "The velocity 
 CTFGooGun::CTFGooGun()
 {
 	m_flChargeBeginTime = 0.0f;
+
 }
 
 //-----------------------------------------------------------------------------
